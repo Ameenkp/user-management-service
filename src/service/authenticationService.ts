@@ -1,10 +1,11 @@
 import {
     AuthFlowType,
     CognitoIdentityProviderClient,
+    RespondToAuthChallengeCommand,
     InitiateAuthCommand, InitiateAuthCommandOutput,
     ListUsersCommand, ListUsersCommandOutput,
 } from "@aws-sdk/client-cognito-identity-provider";
-import { createClientForDefaultRegion } from "../util/awsSdkUtil";
+import {createClientForDefaultRegion, createClientForRegion} from "../util/awsSdkUtil";
 import {
     DynamoDBClient,
 } from "@aws-sdk/client-dynamodb";
@@ -13,72 +14,40 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import {GetCommandOutput} from "@aws-sdk/lib-dynamodb/dist-types/commands";
 
-class AuthenticationService {
-    private client: CognitoIdentityProviderClient;
-    private readonly dynamoClient: DynamoDBClient;
-    private dynamo: DynamoDBDocumentClient;
+import {
+    CognitoIdentityClient
+} from "@aws-sdk/client-cognito-identity";
+
+import { fromCognitoIdentityPool } from "@aws-sdk/credential-provider-cognito-identity";
+import {UserManagementServiceConstants} from "../config/userManagementServiceConstants";
+import {CognitoIdentityCredentials} from "@aws-sdk/credential-provider-cognito-identity/dist-types/fromCognitoIdentity";
+import {AuthenticationResultType} from "@aws-sdk/client-cognito-identity-provider/dist-types/models/models_0";
+import {UserStatusType} from "@aws-sdk/client-cognito-identity-provider/dist-types/models";
+import ProfileService from "./profileService";
+
+
+export class AuthenticationService {
+    private static clientCognitoProvider: CognitoIdentityProviderClient = createClientForDefaultRegion(CognitoIdentityProviderClient);
+    private static readonly clientCognitoIdentity: CognitoIdentityClient = createClientForDefaultRegion(CognitoIdentityClient);
+    private static readonly dynamoClient: DynamoDBClient = new DynamoDBClient(createClientForDefaultRegion);
+    private static readonly cognitoIdentity = createClientForRegion(UserManagementServiceConstants.USER_MANAGEMENT_SERVICE_COGNITO_REGION, CognitoIdentityProviderClient);
+
+    private static dynamo: DynamoDBDocumentClient = DynamoDBDocumentClient.from(this.dynamoClient, {
+        marshallOptions: {
+            removeUndefinedValues: true,
+        },
+    })
 
     constructor() {
-        this.client = createClientForDefaultRegion(CognitoIdentityProviderClient);
-        this.dynamoClient = new DynamoDBClient(createClientForDefaultRegion);
-        this.dynamo = DynamoDBDocumentClient.from(this.dynamoClient, {
-            marshallOptions: {
-                removeUndefinedValues: true,
-            },
-        });
     }
 
-    private async getUserAccount(userPoolId: string, username: string) {
-        try {
-            let params = {
-                UserPoolId: userPoolId,
-                Filter: `phone_number = "${username}"`,
-                Limit: 2
-            };
-            const response:ListUsersCommandOutput= await this.client.send(new ListUsersCommand(params));
-            if (response.Users && response.Users.length > 0) {
-                const validToContinueUsers = response.Users.filter(user => user.UserStatus === "CONFIRMED");
-                if (validToContinueUsers.length > 0)
-                    return { message: validToContinueUsers[0] };
+    /////////////////////////////////////////////////
+    ///MSISDN OTP REQUEST///////
 
-                return { error: "UserExistsButNotAllowedToLogin" };
-            } else {
-                return { error: "UserNotFound" };
-            }
-        } catch (error: any) {
-            console.log("*_checkIfProfileAlreadyExist:", error);
-            return { error: error["__type"] };
-        }
-    }
 
-    private async checkIfProfileAlreadyExist(userPoolId: string, msisdn: string) {
+    public static async initAuth( userPoolId: string, clientId: string, msisdn: string )    {
 
-        const { error, message } = await this.getUserAccount(userPoolId, msisdn);
-        if (error && error !== "UserNotFound") return { error };
-        else if (error) return { error: "ProfileNotFound" };
-        const params = {
-            TableName: "profile",
-            Key: {
-                userId: message?.Username
-            },
-            ProjectionExpression: "userId"
-        };
-        try {
-            let result:GetCommandOutput = await this.dynamo.send(
-                new GetCommand(params)
-            );
-            console.log("*_8", result);
-            if (result.Item) return { message: result.Item };
-            else return { error: "ProfileNotFound" };
-        } catch (error:any) {
-            console.log("*_checkIfProfileAlreadyExist:", error);
-            return { error: error["__type"] };
-        }
-    }
-
-    public async initAuth({ userPoolId, clientId, msisdn }: { userPoolId: string, clientId: string, msisdn: string })    {
-
-        const { error, message } = await this.checkIfProfileAlreadyExist(userPoolId, msisdn);
+        const { error, message } = await ProfileService.checkIfProfileAlreadyExist(userPoolId, msisdn);
         console.log(666, error, message)
         if (error) return { "$metadata": { httpStatusCode: 404 } };
         const command = new InitiateAuthCommand({
@@ -90,7 +59,7 @@ class AuthenticationService {
         });
 
         try {
-            let result:InitiateAuthCommandOutput = await this.client.send(command);
+            let result:InitiateAuthCommandOutput = await this.clientCognitoProvider.send(command);
             return result;
         } catch (err:any) {
             console.log("*_initAuth:", err);
@@ -99,6 +68,73 @@ class AuthenticationService {
             };
         }
     }
-}
 
-export { AuthenticationService };
+    /////////////////////////////////////////////////
+    ///MSISDN OTP VERIFY///////
+
+    public static async verifier(session: string, msisdn: string, otp: string): Promise<{ message?: any, error?: number }> {
+        try {
+            const command = new RespondToAuthChallengeCommand({
+                ChallengeName: 'CUSTOM_CHALLENGE',
+                ClientId: UserManagementServiceConstants.USER_CLIENT_ID,
+                Session: session,
+                ChallengeResponses: {
+                    USERNAME: msisdn,
+                    ANSWER: otp,
+                },
+            });
+            const authResp:InitiateAuthCommandOutput = await this.clientCognitoProvider.send(command);
+            try {
+                const credentialsResp = await this.getCredentials((<AuthenticationResultType>authResp.AuthenticationResult).IdToken as string);
+                return { message: { ...authResp.AuthenticationResult, ...credentialsResp.message } };
+            } catch (err:any) {
+                return { error: err };
+            }
+        } catch (err :any) {
+            console.log("*_initAuth:", err);
+            return { error: (err).$metadata?.httpStatusCode ?? 500 };
+        }
+    }
+
+    private static async getCredentials(idToken: string): Promise<{ message?: any, error?: number }> {
+        let Logins: { [key: string]: string } = {};
+        Logins[`cognito-idp.${UserManagementServiceConstants.USER_MANAGEMENT_SERVICE_DEFAULT_REGION}
+            .amazonaws.com/${UserManagementServiceConstants.USER_POOL_ID}`] = idToken;
+        try {
+            const resp:CognitoIdentityCredentials = await fromCognitoIdentityPool({
+                client: this.clientCognitoIdentity,
+                identityPoolId: <string>UserManagementServiceConstants.IDENTITY_POOL_ID,
+                logins: Logins
+            })();
+            console.log(666, resp);
+            return { message: resp };
+        } catch (err:any) {
+            console.log(err);
+            return { error: 500 };
+        }
+    }
+
+
+    /////////////////////////////////////////////////
+    ///TOKEN REFRESH///////
+    public static async refreshAuthToken(refreshToken:string, clientId:string) {
+        const refreshParams = new InitiateAuthCommand({
+            AuthFlow: AuthFlowType.REFRESH_TOKEN_AUTH,
+            ClientId: clientId,
+            AuthParameters: {
+                REFRESH_TOKEN: refreshToken,
+            },
+        });
+
+        try {
+            const refreshResponse = await this.cognitoIdentity.send(refreshParams);
+            console.log("Token refresh successful");
+            console.log("Access Token: ", refreshResponse.AuthenticationResult.AccessToken);
+            console.log("ID Token: ", refreshResponse.AuthenticationResult.IdToken);
+            return { message: refreshResponse.AuthenticationResult };
+        } catch (error) {
+            console.error("Error during token refresh: ", error);
+            return { error: "SomethingIsWrong" };
+        }
+    }
+}

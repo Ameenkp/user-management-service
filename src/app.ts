@@ -40,6 +40,7 @@ export class App {
      */
     public routeMountings(): void {
         this.app.use(UserManagementServiceConstants.USER_MANAGEMENT_SERVICE_ACCOUNT_MSISDN_URL_PREFIX, new AuthenticationRouter().getRouter());
+
     }
 
     public serveStaticFiles(): void {
