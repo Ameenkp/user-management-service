@@ -27,6 +27,9 @@ export class UserManagementServiceConstants {
     public static readonly USER_MANAGEMENT_SERVICE_ACCOUNT_PHONE_SIGNUP_URL_PART: string = "/signup/phone";
     public static readonly USER_MANAGEMENT_SERVICE_ACCOUNT_PHONE_VERIFY_SIGNUP_URL_PART: string = "/signup/phone/verify";
 
+    public static readonly USER_MANAGEMENT_SERVICE_ACCOUNT_EMAIL_SIGNUP_URL_PART: string = "/signup/email";
+    public static readonly USER_MANAGEMENT_SERVICE_ACCOUNTEMAIL_VERIFY_SIGNUP_URL_PART: string = "/signup/email/verify";
+
 
     public static USER_POOL_ID = process.env.USER_POOL_ID as string;
     public static USER_CLIENT_ID = process.env.USER_CLIENT_ID;

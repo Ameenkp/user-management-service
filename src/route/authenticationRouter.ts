@@ -23,6 +23,9 @@ export class AuthenticationRouter {
         this.router.post(UserManagementServiceConstants.USER_MANAGEMENT_SERVICE_ACCOUNT_PHONE_SIGNUP_URL_PART, this.signupController.phoneSignUpHandler);
         this.router.post(UserManagementServiceConstants.USER_MANAGEMENT_SERVICE_ACCOUNT_PHONE_VERIFY_SIGNUP_URL_PART, this.signupController.phoneSignupVerifyHandler);
 
+        this.router.post(UserManagementServiceConstants.USER_MANAGEMENT_SERVICE_ACCOUNT_EMAIL_SIGNUP_URL_PART, this.signupController.emailSignupHandler);
+        this.router.post(UserManagementServiceConstants.USER_MANAGEMENT_SERVICE_ACCOUNTEMAIL_VERIFY_SIGNUP_URL_PART, this.signupController.emailSignupVerifyHandler);
+
 
     }
 

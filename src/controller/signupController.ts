@@ -54,6 +54,9 @@ export class SignupController {
     }
 
 
+    ////////////////////////////////////////////////
+    // Phone Sign Up
+
     public async phoneSignupVerifyHandler(req: Request, res: Response, next: NextFunction){
         let statusCode = 200;
         let body = {};
@@ -102,13 +105,56 @@ export class SignupController {
     ////////////////////////////////////////////////
     // Email Sign Up
 
-    private async emailSignupHandler (req:Request , res:Response , next:NextFunction) {
+
+    public async emailSignupHandler(req: Request, res: Response, next: NextFunction) {
+        let statusCode = 200;
+        let body = {};
+        const inputBody = JSON.parse(req.body);
+        const { email, password } = inputBody;
+        try {
+            const { error } = await this.emailSignupService.emailSignUp( UserManagementServiceConstants.CLIENT_ID, email, password );
+            if (error) {
+                switch (error) {
+                    case "InvalidPasswordException":
+                    case "InvalidParameterException":
+                        statusCode = 400;
+                        body = { message: error };
+                        break;
+                    case "UsernameExistsException":
+                        statusCode = 409;
+                        body = { message: error };
+                        break;
+                    default:
+                        statusCode = 500;
+                        body = { message: "SomethingIsWrong1" };
+                }
+            } else {
+                body = { message: true };
+            }
+        } catch (err:any) {
+            console.log("*_error:", err);
+            statusCode = 500;
+            body = { message: "SomethingIsWrong2" };
+        }
+
+        const response = {
+            statusCode,
+            body: JSON.stringify(body)
+        };
+        return response;
+    };
+
+
+    ////////////////////////////////////////////////
+    // Email Sign Up verify
+
+    public async emailSignupVerifyHandler (req:Request , res:Response , next:NextFunction) {
         let statusCode:number = 200;
         let body = {};
         const inputBody = JSON.parse(req.body);
         const { email, otp } = inputBody;
         try {
-            await this.emailSignupService.confirmSignUp(UserManagementServiceConstants.CLIENT_ID, email, otp );
+            await this.emailSignupService.confirmEmailSignUp(UserManagementServiceConstants.CLIENT_ID, email, otp );
             statusCode = 200;
             body = {};
         } catch(err:any) {
