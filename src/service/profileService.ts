@@ -5,9 +5,9 @@ import {
     ListUsersCommand,
     ListUsersCommandOutput
 } from "@aws-sdk/client-cognito-identity-provider";
-import {createClientForDefaultRegion} from "../util/awsSdkUtil";
+import {createClientForDefaultRegion} from "../config/awsSdkUtil";
 import {DynamoDBClient} from "@aws-sdk/client-dynamodb";
-import {UserStatusType} from "@aws-sdk/client-cognito-identity-provider/dist-types/models";
+import {UserStatusType} from "@aws-sdk/client-cognito-identity-provider";
 export default class ProfileService {
 
     private static clientCognitoProvider: CognitoIdentityProviderClient = createClientForDefaultRegion(CognitoIdentityProviderClient);

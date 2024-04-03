@@ -5,7 +5,7 @@ import {
     InitiateAuthCommand, InitiateAuthCommandOutput,
     ListUsersCommand, ListUsersCommandOutput,
 } from "@aws-sdk/client-cognito-identity-provider";
-import {createClientForDefaultRegion, createClientForRegion} from "../util/awsSdkUtil";
+import {createClientForDefaultRegion, createClientForRegion} from "../config/awsSdkUtil";
 import {
     DynamoDBClient,
 } from "@aws-sdk/client-dynamodb";

@@ -1,5 +1,5 @@
 import { curry, defaultTo } from "ramda";
-import {UserManagementServiceConstants} from "../config/userManagementServiceConstants";
+import {UserManagementServiceConstants} from "./userManagementServiceConstants";
 
 const orDefaultRegion = defaultTo(UserManagementServiceConstants.USER_MANAGEMENT_SERVICE_DEFAULT_REGION);
 const createClientForRegion = curry(

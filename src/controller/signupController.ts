@@ -2,17 +2,23 @@ import {v4 as uuidv4} from 'uuid';
 import {PhoneSignupService} from "../service/phoneSignupService";
 import {NextFunction, Request, Response} from "express";
 import {UserManagementServiceConstants} from "../config/userManagementServiceConstants";
+import {EmailSignupService} from "../service/emailSignupService";
 
 export class SignupController {
 
-    private signUpService:PhoneSignupService = new PhoneSignupService();
-    public async signUpHandler(req:Request , res:Response , next:NextFunction) {
+    private phoneSignUpService:PhoneSignupService = new PhoneSignupService();
+    private emailSignupService:EmailSignupService = new EmailSignupService();
+
+
+    ////////////////////////////////////////////////
+    // Phone Sign Up
+    public async phoneSignUpHandler(req:Request , res:Response , next:NextFunction) {
         let statusCode = 200;
         let body = {};
         const inputBody = JSON.parse(req.body);
         const {msisdn} = inputBody;
         try {
-            const {error, message} = await this.signUpService.signUp(
+            const {error, message} = await this.phoneSignUpService.signUp(
                 UserManagementServiceConstants.USER_MANAGEMENT_SERVICE_SIGNUP_APP_CLIENT_ID,
                 UserManagementServiceConstants.PHONE_SIGNUP_CHALLENGE_APP_CLIENT_ID,
                 UserManagementServiceConstants.USER_POOL_ID,
@@ -48,13 +54,13 @@ export class SignupController {
     }
 
 
-    public async signupVerifyHandler (req: Request, res: Response, next: NextFunction){
+    public async phoneSignupVerifyHandler(req: Request, res: Response, next: NextFunction){
         let statusCode = 200;
         let body = {};
         const inputBody = JSON.parse(req.body);
         const { msisdn, otp } = inputBody;
         try {
-            const { error, message } = await confirmSignUp( UserMangementServiceConstants.PHONE_SIGNUP_CHALLENGE_APP_CLIENT_ID, UserMangementServiceConstants.USER_MANAGEMENT_SERVICE_SIGNUP_APP_CLIENT_ID, msisdn, otp );
+            const { error, message } = await this.phoneSignUpService.confirmSignUp( UserManagementServiceConstants.PHONE_SIGNUP_CHALLENGE_APP_CLIENT_ID, UserManagementServiceConstants.USER_MANAGEMENT_SERVICE_SIGNUP_APP_CLIENT_ID, msisdn, otp );
             if (error) {
                 switch (error) {
                     case "ExpiredCodeException":
@@ -73,7 +79,7 @@ export class SignupController {
             } else {
                 body = { message };
             }
-        } catch (err) {
+        } catch (err:any) {
             console.log("*_verify:", err);
             switch (err['$metadata'].httpStatusCode) {
                 case 400:
@@ -86,10 +92,41 @@ export class SignupController {
                     break;
             }
         }
-        const response = {
+        return {
             statusCode,
             body: JSON.stringify(body),
         };
-        return response;
+    };
+
+
+    ////////////////////////////////////////////////
+    // Email Sign Up
+
+    private async emailSignupHandler (req:Request , res:Response , next:NextFunction) {
+        let statusCode:number = 200;
+        let body = {};
+        const inputBody = JSON.parse(req.body);
+        const { email, otp } = inputBody;
+        try {
+            await this.emailSignupService.confirmSignUp(UserManagementServiceConstants.CLIENT_ID, email, otp );
+            statusCode = 200;
+            body = {};
+        } catch(err:any) {
+            console.log("*_verify:", err);
+            switch(err['$metadata'].httpStatusCode) {
+                case 400:
+                    statusCode = 400;
+                    body = {message: err["__type"]};
+                    break;
+                case 500:
+                    statusCode = 500;
+                    body = {message: "SomethingIsWrong"};
+                    break;
+            }
+        }
+        return {
+            statusCode,
+            body: JSON.stringify(body),
+        };
     };
 }

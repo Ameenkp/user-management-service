@@ -1,5 +1,5 @@
 import { SNSClient, PublishCommand } from "@aws-sdk/client-sns";
-import { createClientForDefaultRegion } from "../util/awsSdkUtil";
+import { createClientForDefaultRegion } from "../config/awsSdkUtil";
 import {NextFunction, Request , Response} from "express";
 import {UserManagementServiceConstants} from "../config/userManagementServiceConstants";
 import {CustomRequest, CustomResponse} from "../model/confirmMessage.model";
